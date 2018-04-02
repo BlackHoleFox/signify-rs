@@ -7,6 +7,7 @@ extern crate serde_derive;
 extern crate rpassword;
 extern crate ring;
 extern crate untrusted;
+#[macro_use]
 extern crate failure;
 
 extern crate rand;
@@ -270,8 +271,6 @@ fn generate(pubkey_path: String, privkey_path: String, comment: Option<String>, 
     checksum.copy_from_slice(&digest.as_ref()[0..8]);
 
     let private_key = PrivateKey {
-        pkgalg: PKGALG,
-        kdfalg: KDFALG,
         kdfrounds: kdfrounds,
         salt: salt,
         checksum: checksum,
