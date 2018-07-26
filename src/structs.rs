@@ -7,7 +7,7 @@ use errors::*;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
 use sha2::Sha512;
-use ed25519_dalek::{self, Keypair};
+use ed25519_dalek;
 
 pub const KEYNUMLEN : usize = 8;
 pub const PUBLICBYTES : usize = 32;
@@ -23,7 +23,7 @@ pub const COMMENTMAXLEN : usize = 1024;
 
 pub struct PublicKey {
     pub keynum: [u8; KEYNUMLEN],
-    publkey: [u8; PUBLICBYTES],
+    public: ed25519_dalek::PublicKey,
 }
 
 pub struct PrivateKey {
@@ -31,26 +31,26 @@ pub struct PrivateKey {
    pub salt: [u8; 16],
    pub checksum: [u8; 8],
    pub keynum: [u8; KEYNUMLEN],
-   pub seckey: [u8; SECRETBYTES],
+   pub keypair: ed25519_dalek::Keypair,
 }
 
 pub struct Signature {
     pub keynum: [u8; KEYNUMLEN],
-    sig: [u8; SIGBYTES],
+    sig: ed25519_dalek::Signature,
 }
 
 impl PublicKey {
     pub fn with_key_and_keynum(key: [u8; PUBLICBYTES], keynum: [u8; KEYNUMLEN]) -> PublicKey {
         PublicKey {
             keynum: keynum,
-            publkey: key,
+            public: ed25519_dalek::PublicKey::from_bytes(&key).unwrap(),
         }
     }
 
     pub fn write<W: Write>(&self, mut w: W) -> Result<()> {
         w.write(PKGALG)?;
         w.write(&self.keynum)?;
-        w.write(&self.publkey)?;
+        w.write(self.public.as_bytes())?;
 
         Ok(())
     }
@@ -62,17 +62,19 @@ impl PublicKey {
 
         let mut scratch = [0; 2];
         let mut keynum = [0; KEYNUMLEN];
-        let mut publkey = [0; PUBLICBYTES];
+        let mut public = [0; PUBLICBYTES];
 
         buf.read(&mut scratch)?;
         ensure!(&scratch == PKGALG, "Invalid Pkg algorithm");
 
         buf.read(&mut keynum)?;
-        buf.read(&mut publkey)?;
+        buf.read(&mut public)?;
+
+        let public = ed25519_dalek::PublicKey::from_bytes(&public)?;
 
         Ok(PublicKey {
             keynum: keynum,
-            publkey: publkey,
+            public: public,
         })
     }
 }
@@ -85,7 +87,7 @@ impl PrivateKey {
         w.write(&self.salt)?;
         w.write(&self.checksum)?;
         w.write(&self.keynum)?;
-        w.write(&self.seckey)?;
+        w.write(&self.keypair.to_bytes())?;
 
         Ok(())
     }
@@ -100,7 +102,7 @@ impl PrivateKey {
         let mut salt = [0; 16];
         let mut checksum = [0; 8];
         let mut keynum = [0; KEYNUMLEN];
-        let mut seckey = [0; SECRETBYTES];
+        let mut keypair = [0; SECRETBYTES];
 
         buf.read(&mut scratch)?;
         ensure!(&scratch == PKGALG, "Invalid Pkg algorithm");
@@ -111,23 +113,24 @@ impl PrivateKey {
         buf.read(&mut salt)?;
         buf.read(&mut checksum)?;
         buf.read(&mut keynum)?;
-        buf.read(&mut seckey)?;
+        buf.read(&mut keypair)?;
+
+        let keypair = ed25519_dalek::Keypair::from_bytes(&keypair)?;
 
         Ok(PrivateKey {
             kdfrounds: kdfrounds,
             salt: salt,
             checksum: checksum,
             keynum: keynum,
-            seckey: seckey,
+            keypair: keypair,
         })
     }
 
     pub fn sign(&self, msg: &[u8]) -> Result<Signature> {
-        let keypair = Keypair::from_bytes(&self.seckey)?;
-        let signature = keypair.sign::<Sha512>(msg);
+        let signature = self.keypair.sign::<Sha512>(msg);
         Ok(Signature {
             keynum: self.keynum,
-            sig: signature.to_bytes(),
+            sig: signature,
         })
     }
 }
@@ -136,7 +139,7 @@ impl Signature {
     pub fn write<W: Write>(&self, mut w: W) -> Result<()> {
         w.write(PKGALG)?;
         w.write(&self.keynum)?;
-        w.write(&self.sig)?;
+        w.write(&self.sig.to_bytes())?;
 
         Ok(())
     }
@@ -156,6 +159,8 @@ impl Signature {
         buf.read(&mut keynum)?;
         buf.read(&mut sig)?;
 
+        let sig = ed25519_dalek::Signature::from_bytes(&sig)?;
+
         Ok(Signature {
             keynum: keynum,
             sig: sig,
@@ -163,9 +168,6 @@ impl Signature {
     }
 
     pub fn verify(&self, msg: &[u8], pkey: &PublicKey) -> bool {
-        let public_key = ed25519_dalek::PublicKey::from_bytes(&pkey.publkey).unwrap();
-        let sig = ed25519_dalek::Signature::from_bytes(&self.sig).unwrap();
-
-        public_key.verify::<Sha512>(msg, &sig)
+        pkey.public.verify::<Sha512>(msg, &self.sig)
     }
 }

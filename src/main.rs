@@ -174,10 +174,11 @@ fn sign(seckey_path: String, msg_path: String, signature_path: Option<String>, e
     let rounds = skey.kdfrounds;
     let xorkey = kdf(&skey.salt, rounds, false, SECRETBYTES)?;
 
-    for (prv, xor) in skey.seckey.iter_mut().zip(xorkey.iter()) {
+    let mut secret = skey.keypair.secret.to_bytes();
+    for (prv, xor) in secret.iter_mut().zip(xorkey.iter()) {
         *prv = *prv ^ xor;
     }
-    let skey = skey;
+    let secret = secret;
 
     let mut msgfile = File::open(&msg_path)?;
     let mut msg = vec![];
@@ -275,7 +276,7 @@ fn generate(pubkey_path: String, privkey_path: String, comment: Option<String>, 
         salt: salt,
         checksum: checksum,
         keynum: keynum,
-        seckey: complete_key,
+        keypair: Keypair::from_bytes(&complete_key)?,
     };
 
     let mut out = vec![];
