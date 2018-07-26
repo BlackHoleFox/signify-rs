@@ -1,8 +1,6 @@
-use std::time::SystemTime;
-use std::time::UNIX_EPOCH;
-
 use ed25519;
 use base64;
+use sha2;
 use failure::Error;
 
 use config::Config;
@@ -25,9 +23,9 @@ impl KeyData {
         Ok(KeyData::create(keypair, config.timestamp()))
     }
 
-    pub fn sign(&self, data: &[u8]) -> Result<(), Error> {
-        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-        Ok(())
+    pub fn sign(&self, data: &[u8]) -> String {
+        let signature = self.keypair.sign::<sha2::Sha512>(data);
+        base64::encode(&signature.to_bytes()[..])
     }
 
     pub fn keypair(&self) -> &ed25519::Keypair {
