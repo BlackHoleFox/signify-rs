@@ -4,7 +4,7 @@ version = "0.4.1"
 authors = ["Jan-Erik Rediger <janerik@fnordig.de>"]
 
 keywords = [ "cryptography", "security" ]
-description = "Create cryptographic signatures for files and verify them"
+description = "Create cryptographic signatures and verify them"
 
 readme = "README.md"
 license = "MIT"
@@ -24,16 +24,12 @@ include = [
 ]
 
 [dependencies]
-byteorder = "1.2"
-rust-crypto = "0.2.36"
 base64 = "0.9.0"
-docopt = "0.8"
-rpassword = "2"
-ring = "0.12.1"
-untrusted = "0.5"
 failure = "0.1"
 serde = "1.0"
 serde_derive = "1.0"
 ed25519-dalek = "0.6"
 rand = "0.4"
 sha2 = "0.7"
+structopt = "0.2.10"
+toml = "0.4.6"
